@@ -45,6 +45,8 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+
 // test
 
 app.get("/ping", (req, res) => res.status(200).send("pong"));
