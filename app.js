@@ -1,20 +1,37 @@
 require("dotenv").config();
+
 const express = require("express");
+const mongoose = require("mongoose");
 const swaggerUi = require("swagger-ui-express");
 const YAML = require("yamljs");
-const swaggerDocument = YAML.load("./swagger.yaml"); // mets ton fichier swagger.yaml à la racine
 
-const mongoose = require("mongoose");
 const app = express();
-const bodyParser = require("body-parser");
 
-// Middleware
-//app.use(morgan('dev'));
-//app.use('/uploads', express.static('uploads'));
-//app.use(bodyParser.json({ limit: '50mb' }));
-//app.use(bodyParser.urlencoded({ extended: false, limit: '50mb', parameterLimit: 50000 }));
+// ✅ Charge swagger.yaml (mets-le bien à la racine du projet, au même niveau que app.js/server.js)
+const swaggerDocument = YAML.load("./swagger.yaml");
 
-// Connexion à la base de données MongoDB
+// ✅ Parse JSON (utile pour tes POST)
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// ✅ CORS
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Headers", "*");
+  if (req.method === "OPTIONS") {
+    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE");
+    return res.status(200).json({});
+  }
+  next();
+});
+
+// ✅ Swagger (AVANT le 404)
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+
+// ✅ Route test
+app.get("/ping", (req, res) => res.status(200).send("pong"));
+
+// ✅ MongoDB
 if (process.env.ENV === "dev") {
   mongoose
     .connect(
@@ -33,53 +50,20 @@ if (process.env.ENV === "dev") {
     );
 }
 
-// Gestion CORS
+// ✅ Tes routes (attention au nom du dossier Routes vs routes sur Render)
+require("./Routes/users")(app);
 
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Headers", "*");
-  if (req.method === "OPTIONS") {
-    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE");
-    return res.status(200).json({});
-  }
-  next();
+// ✅ 404 (TOUJOURS après les routes)
+app.use((req, res) => {
+  res.status(404).json({ error: "Route non trouvée", route: req.url });
 });
 
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
-
-// test
-
-app.get("/ping", (req, res) => res.status(200).send("pong"));
-
-// Test simple de votre middleware
-
-// Gestion des erreurs 404
-
-const routes = require("./Routes/users")(app);
-
-// Gestion des erreurs 404
-
-app.use((req, res, next) => {
-  const error = new Error("Route non trouvée");
-  error.status = 404;
-  next(error);
-});
-
-// Application Error handling
-
-// Gestion globale des erreurs
-
+// ✅ Gestion globale des erreurs
 app.use((err, req, res, next) => {
   res.status(err.status || 500).json({
-    error: err.message,
+    error: err.message || "Erreur serveur",
     route: req.url,
   });
 });
 
-app.use((req, res, next) => {
-  res.status(200).json({ message: "Hello world !!" });
-});
-
 module.exports = app;
-
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
